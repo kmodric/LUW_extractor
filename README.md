@@ -48,3 +48,9 @@ Click on button "Yes"
 
 
 ![image](https://user-images.githubusercontent.com/6062110/231782012-00d2843b-6195-4ea7-ae1a-b85e364cc792.png)
+<br />
+You can download binary exe files from /bin folder or from google drive:
+<br />
+https://drive.google.com/file/d/1TzGSVzZpltNw5i9s4dQCeOtku_qKIrMt/view?usp=share_link
+<br />
+NOTE: You will need to unzip to folder and run it from there.
