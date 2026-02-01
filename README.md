@@ -54,3 +54,11 @@ You can download binary exe files from /bin folder or from google drive:
 https://drive.google.com/file/d/1TzGSVzZpltNw5i9s4dQCeOtku_qKIrMt/view?usp=share_link
 <br />
 NOTE: You will need to unzip to folder and run it from there.
+
+==
+<br />
+UPDATED: February 1, 2026
+<br />
+Added ABAP code: ZSM58_LUW_EXTRACT_ABAP.txt so no need for C# program anymore :-)
+<br />
+![Demo](./images/ZSM58_LUW_EXTRACT_ABAP.gif)
