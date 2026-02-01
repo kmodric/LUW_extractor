@@ -1,0 +1,318 @@
+REPORT zsm58_luw_extract_abap.
+
+*----------------------------------------------------------------------
+* Selection screen (labels set via SE38 Text elements -> Selection texts)
+*----------------------------------------------------------------------
+PARAMETERS: p_in   TYPE string OBLIGATORY,
+            p_out  TYPE string OBLIGATORY,
+            p_open AS CHECKBOX DEFAULT 'X'.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_in.
+  PERFORM f4_infile CHANGING p_in.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_out.
+  PERFORM f4_outfile CHANGING p_out.
+
+START-OF-SELECTION.
+  PERFORM run USING p_in p_out p_open.
+
+*----------------------------------------------------------------------
+* F4 helpers
+*----------------------------------------------------------------------
+FORM f4_infile CHANGING cv_in TYPE string.
+  DATA: lt_files TYPE filetable,
+        lv_rc    TYPE i,
+        ls_file  TYPE file_table.
+
+  cl_gui_frontend_services=>file_open_dialog(
+    CHANGING
+      file_table = lt_files
+      rc         = lv_rc
+    EXCEPTIONS
+      OTHERS     = 1 ).
+
+  IF sy-subrc = 0 AND lv_rc > 0.
+    READ TABLE lt_files INDEX 1 INTO ls_file.
+    IF sy-subrc = 0.
+      cv_in = ls_file-filename.
+    ENDIF.
+  ENDIF.
+ENDFORM.
+
+FORM f4_outfile CHANGING cv_out TYPE string.
+  DATA: lv_path     TYPE string,
+        lv_file     TYPE string,
+        lv_fullpath TYPE string.
+
+  cl_gui_frontend_services=>file_save_dialog(
+    EXPORTING
+      default_extension = 'pdf'
+      default_file_name = 'extracted.pdf'
+    CHANGING
+      path             = lv_path
+      filename         = lv_file
+      fullpath         = lv_fullpath
+    EXCEPTIONS
+      OTHERS           = 1 ).
+
+  IF sy-subrc = 0 AND lv_fullpath IS NOT INITIAL.
+    cv_out = lv_fullpath.
+  ENDIF.
+ENDFORM.
+
+*----------------------------------------------------------------------
+* Convert 2 hex chars into byte
+*----------------------------------------------------------------------
+FORM hexpair_to_byte USING    iv_pair TYPE string
+                     CHANGING ev_byte TYPE x.
+  DATA lv_x1 TYPE x LENGTH 1.
+  lv_x1 = iv_pair.
+  ev_byte = lv_x1.
+ENDFORM.
+
+*----------------------------------------------------------------------
+* Output streaming into SOLIX_TAB
+*----------------------------------------------------------------------
+FORM append_byte_to_out USING    iv_byte TYPE x
+                        CHANGING ct_bin  TYPE solix_tab
+                                 cs_bin  TYPE solix
+                                 cv_pos  TYPE i
+                                 cv_size TYPE i.
+  DATA lv_off TYPE i.
+
+  lv_off = cv_pos.
+  cs_bin-line+lv_off(1) = iv_byte.
+
+  cv_pos  = cv_pos + 1.
+  cv_size = cv_size + 1.
+
+  IF cv_pos >= 255.
+    APPEND cs_bin TO ct_bin.
+    CLEAR cs_bin.
+    cv_pos = 0.
+  ENDIF.
+ENDFORM.
+
+FORM append_xstring_to_out USING    iv_x    TYPE xstring
+                          CHANGING ct_bin  TYPE solix_tab
+                                   cs_bin  TYPE solix
+                                   cv_pos  TYPE i
+                                   cv_size TYPE i.
+  DATA: lv_len TYPE i,
+        lv_i   TYPE i,
+        lv_b   TYPE x LENGTH 1.
+
+  lv_len = xstrlen( iv_x ).
+  lv_i = 0.
+  WHILE lv_i < lv_len.
+    lv_b = iv_x+lv_i(1).
+    PERFORM append_byte_to_out USING lv_b CHANGING ct_bin cs_bin cv_pos cv_size.
+    lv_i = lv_i + 1.
+  ENDWHILE.
+ENDFORM.
+
+FORM truncate_solix_tab USING    iv_keep_bytes TYPE i
+                       CHANGING ct_bin        TYPE solix_tab.
+  DATA: lv_lines_needed TYPE i,
+        lv_full_lines   TYPE i,
+        lv_remainder    TYPE i.
+
+  IF iv_keep_bytes <= 0.
+    CLEAR ct_bin.
+    RETURN.
+  ENDIF.
+
+  lv_full_lines = iv_keep_bytes DIV 255.
+  lv_remainder  = iv_keep_bytes MOD 255.
+
+  IF lv_remainder = 0.
+    lv_lines_needed = lv_full_lines.
+  ELSE.
+    lv_lines_needed = lv_full_lines + 1.
+  ENDIF.
+
+  IF lines( ct_bin ) > lv_lines_needed.
+    DELETE ct_bin FROM ( lv_lines_needed + 1 ) TO lines( ct_bin ).
+  ENDIF.
+ENDFORM.
+
+*----------------------------------------------------------------------
+* Process one byte: start at %PDF, remember last %%EOF
+*----------------------------------------------------------------------
+FORM process_byte USING    iv_byte        TYPE x
+                  CHANGING cv_started     TYPE c
+                           cv_buf4        TYPE xstring
+                           cv_buf5        TYPE xstring
+                           cv_last_eof_at TYPE i
+                           ct_bin         TYPE solix_tab
+                           cs_bin         TYPE solix
+                           cv_pos         TYPE i
+                           cv_size        TYPE i.
+
+  CONSTANTS: lc_true TYPE c LENGTH 1 VALUE 'X'.
+  CONSTANTS: lc_pdf_start_x TYPE x LENGTH 4 VALUE '25504446'.  " %PDF
+  CONSTANTS: lc_pdf_end_x   TYPE x LENGTH 5 VALUE '2525454F46'. " %%EOF
+
+  DATA: lv_b   TYPE xstring,
+        lv_one TYPE x LENGTH 1.
+
+  lv_one = iv_byte.
+  lv_b = lv_one.
+
+  cv_buf4 = cv_buf4 && lv_b.
+  IF xstrlen( cv_buf4 ) > 4.
+    cv_buf4 = cv_buf4+1.
+  ENDIF.
+
+  cv_buf5 = cv_buf5 && lv_b.
+  IF xstrlen( cv_buf5 ) > 5.
+    cv_buf5 = cv_buf5+1.
+  ENDIF.
+
+  IF cv_started <> lc_true.
+    IF xstrlen( cv_buf4 ) = 4 AND cv_buf4 = lc_pdf_start_x.
+      cv_started = lc_true.
+      PERFORM append_xstring_to_out USING cv_buf4 CHANGING ct_bin cs_bin cv_pos cv_size.
+    ENDIF.
+    RETURN.
+  ENDIF.
+
+  PERFORM append_byte_to_out USING iv_byte CHANGING ct_bin cs_bin cv_pos cv_size.
+
+  IF xstrlen( cv_buf5 ) = 5 AND cv_buf5 = lc_pdf_end_x.
+    cv_last_eof_at = cv_size.
+  ENDIF.
+ENDFORM.
+
+*----------------------------------------------------------------------
+* Main
+*----------------------------------------------------------------------
+FORM run USING iv_in   TYPE string
+               iv_out  TYPE string
+               iv_open TYPE c.
+
+  DATA: lt_lines TYPE STANDARD TABLE OF string,
+        lv_line  TYPE string.
+
+  DATA: lt_bin      TYPE solix_tab,
+        ls_bin      TYPE solix,
+        lv_pos      TYPE i,
+        lv_size     TYPE i,
+        lv_started  TYPE c LENGTH 1,
+        lv_buf4     TYPE xstring,
+        lv_buf5     TYPE xstring,
+        lv_last_eof TYPE i.
+
+  DATA: lv_up   TYPE string,
+        lv_off  TYPE i,
+        lv_tail TYPE string,
+        lv_hex  TYPE string,
+        lv_i    TYPE i,
+        lv_ch   TYPE c LENGTH 1,
+        lv_len  TYPE i,
+        lv_pair TYPE string,
+        lv_byte TYPE x LENGTH 1.
+
+  CLEAR: lt_bin, ls_bin, lv_pos, lv_size, lv_started, lv_buf4, lv_buf5, lv_last_eof.
+
+  cl_gui_frontend_services=>gui_upload(
+    EXPORTING
+      filename = iv_in
+      filetype = 'ASC'
+    CHANGING
+      data_tab = lt_lines
+    EXCEPTIONS
+      OTHERS   = 1 ).
+  IF sy-subrc <> 0.
+    MESSAGE 'Cannot read input file (GUI_UPLOAD).' TYPE 'E'.
+  ENDIF.
+
+  LOOP AT lt_lines INTO lv_line.
+
+    lv_up = lv_line.
+    TRANSLATE lv_up TO UPPER CASE.
+
+    FIND 'BINARY' IN lv_up MATCH OFFSET lv_off.
+    IF sy-subrc <> 0.
+      CONTINUE.
+    ENDIF.
+
+    lv_off = lv_off + 6.
+    lv_tail = lv_up+lv_off.
+
+    REPLACE ALL OCCURRENCES OF '|' IN lv_tail WITH space.
+    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN lv_tail WITH space.
+    CONDENSE lv_tail NO-GAPS.
+
+    CLEAR lv_hex.
+    lv_i = 0.
+    WHILE lv_i < strlen( lv_tail ).
+      lv_ch = lv_tail+lv_i(1).
+      IF lv_ch CO '0123456789ABCDEF'.
+        CONCATENATE lv_hex lv_ch INTO lv_hex IN CHARACTER MODE.
+      ENDIF.
+      lv_i = lv_i + 1.
+    ENDWHILE.
+
+    IF lv_hex IS INITIAL.
+      CONTINUE.
+    ENDIF.
+
+    IF ( strlen( lv_hex ) MOD 2 ) <> 0.
+      CONTINUE.
+    ENDIF.
+
+    lv_len = strlen( lv_hex ).
+    lv_i = 0.
+    WHILE lv_i < lv_len.
+      lv_pair = lv_hex+lv_i(2).
+      lv_i = lv_i + 2.
+
+      PERFORM hexpair_to_byte USING lv_pair CHANGING lv_byte.
+
+      PERFORM process_byte USING lv_byte
+        CHANGING lv_started lv_buf4 lv_buf5 lv_last_eof
+                 lt_bin ls_bin lv_pos lv_size.
+    ENDWHILE.
+
+  ENDLOOP.
+
+  IF lv_started <> 'X' OR lv_size = 0.
+    MESSAGE 'PDF start signature (%PDF) not found in dump.' TYPE 'E'.
+  ENDIF.
+
+  IF lv_last_eof <= 0.
+    MESSAGE 'PDF started, but no %%EOF marker was found.' TYPE 'E'.
+  ENDIF.
+
+  IF lv_pos > 0.
+    APPEND ls_bin TO lt_bin.
+  ENDIF.
+
+  PERFORM truncate_solix_tab USING lv_last_eof CHANGING lt_bin.
+
+  cl_gui_frontend_services=>gui_download(
+    EXPORTING
+      filename     = iv_out
+      filetype     = 'BIN'
+      bin_filesize = lv_last_eof
+    CHANGING
+      data_tab     = lt_bin
+    EXCEPTIONS
+      OTHERS       = 1 ).
+  IF sy-subrc <> 0.
+    MESSAGE 'Cannot write output file (GUI_DOWNLOAD).' TYPE 'E'.
+  ENDIF.
+
+  IF iv_open = 'X'.
+    cl_gui_frontend_services=>execute(
+      EXPORTING
+        document = iv_out
+      EXCEPTIONS
+        OTHERS   = 1 ).
+  ENDIF.
+
+  WRITE: / 'OK. Saved:', iv_out,
+         / 'Bytes (up to last %%EOF):', lv_last_eof.
+
+ENDFORM.
