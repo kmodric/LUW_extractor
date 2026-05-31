@@ -62,3 +62,11 @@ UPDATED: February 1, 2026
 Added ABAP code: ZSM58_LUW_EXTRACT_ABAP.txt so no need for C# program anymore :-)
 <br />
 ![Demo](./images/ZSM58_LUW_EXTRACT_ABAP.gif)
+
+==
+<br />
+UPDATED: May 31, 2026
+<br />
+Added HTML/JS code: luw_extractor_web.html so no need for C# or ABAP program anymore, just browser :-)
+<br />
+![Demo](./images/LuwExtractorWeb.gif)
