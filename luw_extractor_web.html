@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SM58 LUW File Extractor - HTML/JS</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --border: #334155;
+      --accent: #38bdf8;
+      --accent-2: #22c55e;
+      --danger: #f87171;
+      --warning: #fbbf24;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --muted: #64748b;
+        --text: #0f172a;
+        --border: #cbd5e1;
+        --shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 34rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 60px;
+    }
+
+    header {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.25rem;
+    }
+
+    .subtitle {
+      max-width: 900px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 940px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-body { padding: 20px; }
+
+    .stack { display: grid; gap: 16px; }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .dropzone {
+      display: grid;
+      place-items: center;
+      min-height: 170px;
+      padding: 24px;
+      border: 2px dashed var(--border);
+      border-radius: 20px;
+      text-align: center;
+      transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+      cursor: pointer;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .dropzone strong { font-size: 1.1rem; }
+    .dropzone small { color: var(--muted); }
+
+    input[type="file"] { display: none; }
+
+    textarea, input[type="text"], input[type="number"], select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+    }
+
+    textarea:focus, input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
+    }
+
+    textarea {
+      min-height: 250px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88rem;
+      white-space: pre;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .row { grid-template-columns: 1fr; }
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button, .download {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 46px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #07121f;
+    }
+
+    button.secondary, .download {
+      background: color-mix(in srgb, var(--panel) 70%, var(--text) 10%);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    button:disabled, .download[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .status {
+      border-radius: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 80%, var(--bg));
+      color: var(--muted);
+      min-height: 48px;
+    }
+
+    .status.ok { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 45%, var(--border)); }
+    .status.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+    .status.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+      min-width: 0;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.05rem;
+      word-break: break-word;
+    }
+
+    .hashes {
+      display: grid;
+      gap: 10px;
+    }
+
+    .hash-row {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+      min-width: 0;
+    }
+
+    .hash-row span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .hash-row code {
+      display: block;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .help {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    details {
+      border-top: 1px solid var(--border);
+      padding: 16px 20px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    ol, ul { padding-left: 1.2rem; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .preview {
+      width: 100%;
+      min-height: 520px;
+      border: 0;
+      border-top: 1px solid var(--border);
+      background: #fff;
+      display: none;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SM58 LUW File Extractor</h1>
+      <p class="subtitle">
+        Standalone HTML/JavaScript tool for extracting a file from a saved SAP SM58 LUW log.
+        Everything runs locally in your browser; the input file is not uploaded anywhere.
+      </p>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card-body stack">
+          <div>
+            <label for="fileInput">1. Load the SM58 log</label>
+            <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose or drop an SM58 log file">
+              <div>
+                <strong>Click here or drop a .txt/.log file</strong><br />
+                <small>You can also paste the full SM58 log content into the text area below.</small>
+              </div>
+            </div>
+            <input id="fileInput" type="file" accept=".txt,.log,.sap,text/plain,*/*" />
+          </div>
+
+          <div>
+            <label for="logText">SM58 log text</label>
+            <textarea id="logText" spellcheck="false" placeholder="Paste the SM58 Display Data of tRFC LUW text here..."></textarea>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="mode">Extraction mode</label>
+              <select id="mode">
+                <option value="auto">Auto: find %PDF; otherwise export all binary data as .txt</option>
+                <option value="secondLineNo">C# compatible: after the 2nd Line-No 00000001</option>
+                <option value="nthLineNo">Manual: after the Nth Line-No 00000001</option>
+                <option value="allBinary">All binary rows from the log</option>
+              </select>
+            </div>
+            <div>
+              <label for="nthLineNo">N for manual mode</label>
+              <input id="nthLineNo" type="number" min="1" step="1" value="2" />
+            </div>
+          </div>
+
+          <div>
+            <label for="outputBaseName">Output base file name</label>
+            <input id="outputBaseName" type="text" value="sm58_luw_extracted" />
+            <p class="help">The tool automatically adds <code>.pdf</code> when the extracted bytes start with <code>%PDF</code>; otherwise it adds <code>.txt</code>.</p>
+          </div>
+
+          <div class="buttons">
+            <button id="extractBtn" class="primary" type="button">Extract file</button>
+            <a id="downloadLink" class="download" aria-disabled="true">Download result</a>
+            <button id="clearBtn" class="secondary" type="button">Clear</button>
+          </div>
+
+          <div id="status" class="status">Load or paste an SM58 log, then click Extract file.</div>
+        </div>
+
+        <iframe id="preview" class="preview" title="PDF preview"></iframe>
+      </section>
+
+      <aside class="card">
+        <div class="card-body stack">
+          <div>
+            <h2>What this tool does</h2>
+            <p class="help">
+              It finds SAP rows such as <code>binary 25504446...</code>, joins the hex values,
+              converts them to bytes, detects whether the result is a PDF, and creates a local download.
+              For PDF output, auto mode trims from <code>%PDF</code> to the last <code>%%EOF</code> marker.
+            </p>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><span>Binary rows</span><strong id="statRows">-</strong></div>
+            <div class="stat"><span>Hex chars</span><strong id="statHex">-</strong></div>
+            <div class="stat"><span>Bytes</span><strong id="statBytes">-</strong></div>
+            <div class="stat"><span>Detected type</span><strong id="statType">-</strong></div>
+          </div>
+
+          <div>
+            <h2>Output hashes</h2>
+            <div class="hashes">
+              <div class="hash-row"><span>MD5</span><code id="hashMd5">-</code></div>
+              <div class="hash-row"><span>SHA-1</span><code id="hashSha1">-</code></div>
+              <div class="hash-row"><span>SHA-256</span><code id="hashSha256">-</code></div>
+              <div class="hash-row"><span>SHA-512</span><code id="hashSha512">-</code></div>
+            </div>
+          </div>
+
+          <p class="help">
+            Note: the browser cannot read SM58 directly from SAP GUI/RFC. You still need to save or copy the SM58 display data into a text file first.
+          </p>
+        </div>
+
+        <details>
+          <summary>Instructions</summary>
+          <ol>
+            <li>Open SM58 in SAP and display the Transaction ID / LUW data.</li>
+            <li>Save the display as <code>.txt</code> or copy the full text.</li>
+            <li>Load the file here, or paste the text into the text area.</li>
+            <li>Click <strong>Extract file</strong>.</li>
+            <li>Download the result and compare the displayed hashes if needed.</li>
+          </ol>
+        </details>
+
+        <details>
+          <summary>Mapping to the old C# tool</summary>
+          <ul>
+            <li>The old tool waited for the second <code>Line-No: 00000001</code>.</li>
+            <li>After that, it took hex data from rows containing <code>binary</code>.</li>
+            <li>This version keeps that compatible mode, but the default auto mode is safer because it searches for the actual <code>%PDF</code> signature.</li>
+            <li>If no PDF signature is found, the extracted bytes are still downloadable as <code>.txt</code>.</li>
+          </ul>
+        </details>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const fileInput = document.getElementById('fileInput');
+      const dropzone = document.getElementById('dropzone');
+      const logText = document.getElementById('logText');
+      const mode = document.getElementById('mode');
+      const nthLineNo = document.getElementById('nthLineNo');
+      const outputBaseName = document.getElementById('outputBaseName');
+      const extractBtn = document.getElementById('extractBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const downloadLink = document.getElementById('downloadLink');
+      const statusBox = document.getElementById('status');
+      const preview = document.getElementById('preview');
+      const statRows = document.getElementById('statRows');
+      const statHex = document.getElementById('statHex');
+      const statBytes = document.getElementById('statBytes');
+      const statType = document.getElementById('statType');
+      const hashMd5 = document.getElementById('hashMd5');
+      const hashSha1 = document.getElementById('hashSha1');
+      const hashSha256 = document.getElementById('hashSha256');
+      const hashSha512 = document.getElementById('hashSha512');
+
+      let currentBlobUrl = null;
+
+      function setStatus(message, type = '') {
+        statusBox.textContent = message;
+        statusBox.className = `status ${type}`.trim();
+      }
+
+      function setHashPlaceholders(value = '-') {
+        hashMd5.textContent = value;
+        hashSha1.textContent = value;
+        hashSha256.textContent = value;
+        hashSha512.textContent = value;
+      }
+
+      function resetResult() {
+        if (currentBlobUrl) {
+          URL.revokeObjectURL(currentBlobUrl);
+          currentBlobUrl = null;
+        }
+        downloadLink.removeAttribute('href');
+        downloadLink.removeAttribute('download');
+        downloadLink.setAttribute('aria-disabled', 'true');
+        downloadLink.textContent = 'Download result';
+        preview.removeAttribute('src');
+        preview.style.display = 'none';
+        statRows.textContent = '-';
+        statHex.textContent = '-';
+        statBytes.textContent = '-';
+        statType.textContent = '-';
+        setHashPlaceholders('-');
+      }
+
+      function fileBaseName(name) {
+        return (name || '')
+          .replace(/[\\/:*?"<>|]+/g, '_')
+          .replace(/\.[^/.]+$/, '')
+          .trim() || 'sm58_luw_extracted';
+      }
+
+      function loadFile(file) {
+        if (!file) return;
+        resetResult();
+        const reader = new FileReader();
+        reader.onload = () => {
+          logText.value = String(reader.result || '');
+          outputBaseName.value = fileBaseName(file.name);
+          setStatus(`Loaded file: ${file.name} (${formatNumber(logText.value.length)} characters).`, 'ok');
+        };
+        reader.onerror = () => setStatus('Could not read the selected file.', 'error');
+        reader.readAsText(file);
+      }
+
+      function formatNumber(value) {
+        return new Intl.NumberFormat('en-US').format(value);
+      }
+
+      function findNthIndex(text, needle, nth) {
+        let index = -1;
+        let from = 0;
+        for (let i = 0; i < nth; i += 1) {
+          index = text.indexOf(needle, from);
+          if (index === -1) return -1;
+          from = index + needle.length;
+        }
+        return index;
+      }
+
+      function segmentForMode(text) {
+        const selectedMode = mode.value;
+        if (selectedMode === 'allBinary' || selectedMode === 'auto') {
+          return { segment: text, note: selectedMode };
+        }
+
+        const nth = selectedMode === 'secondLineNo' ? 2 : Math.max(1, Number(nthLineNo.value || 1));
+        const marker = 'Line-No: 00000001';
+        const index = findNthIndex(text, marker, nth);
+        if (index === -1) {
+          throw new Error(`Could not find occurrence ${nth} of marker "${marker}".`);
+        }
+        return { segment: text.slice(index), note: `${nth}. Line-No block` };
+      }
+
+      function collectBinaryHex(segment) {
+        const chunks = [];
+        let rows = 0;
+        const lines = segment.split(/\n/);
+
+        for (const line of lines) {
+          const match = line.match(/\bbinary\b([\s0-9A-Fa-f]+)(?:\||$)/i);
+          if (!match) continue;
+
+          const hex = match[1].replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+          if (!hex) continue;
+          rows += 1;
+          chunks.push(hex);
+        }
+
+        if (!chunks.length) {
+          throw new Error('No SM58 rows containing "binary" hex values were found.');
+        }
+
+        return { hex: chunks.join(''), rows };
+      }
+
+      function normalizeHex(hex) {
+        let normalized = hex;
+        let pdfStart = normalized.indexOf('25504446'); // %PDF
+        let usedPdfTrim = false;
+        let usedEofTrim = false;
+
+        if (mode.value === 'auto' && pdfStart >= 0) {
+          normalized = normalized.slice(pdfStart);
+          usedPdfTrim = true;
+          pdfStart = 0;
+        }
+
+        const startsWithPdf = normalized.startsWith('25504446');
+        if (startsWithPdf && normalized.includes('2525454F46')) {
+          const eofMagic = '2525454F46'; // %%EOF
+          const eofIndex = normalized.lastIndexOf(eofMagic);
+          let end = eofIndex + eofMagic.length;
+
+          // Keep immediate CR/LF after %%EOF, but remove fixed-length SAP padding spaces.
+          for (let i = 0; i < 4 && end + 2 <= normalized.length; i += 1) {
+            const nextByte = normalized.slice(end, end + 2).toUpperCase();
+            if (nextByte === '0D' || nextByte === '0A') {
+              end += 2;
+            } else {
+              break;
+            }
+          }
+          normalized = normalized.slice(0, end);
+          usedEofTrim = true;
+        }
+
+        if (normalized.length % 2 !== 0) {
+          throw new Error('The collected hex value has an odd number of characters. Check that the log is not truncated, or try another extraction mode.');
+        }
+
+        return {
+          hex: normalized,
+          pdfFound: normalized.startsWith('25504446'),
+          pdfFoundElsewhere: !startsWithPdf && pdfStart > 0,
+          usedPdfTrim,
+          usedEofTrim
+        };
+      }
+
+      function hexToBytes(hex) {
+        if (!/^[0-9A-Fa-f]*$/.test(hex)) {
+          throw new Error('The collected data contains characters that are not valid hex digits.');
+        }
+
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < bytes.length; i += 1) {
+          bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+        }
+        return bytes;
+      }
+
+      function isPdfBytes(bytes) {
+        return bytes.length >= 5 &&
+          bytes[0] === 0x25 && // %
+          bytes[1] === 0x50 && // P
+          bytes[2] === 0x44 && // D
+          bytes[3] === 0x46 && // F
+          bytes[4] === 0x2D;   // -
+      }
+
+      function makeFileName(baseName, extension) {
+        const cleaned = (baseName || 'sm58_luw_extracted')
+          .replace(/[\\/:*?"<>|]+/g, '_')
+          .replace(/\.(pdf|txt)$/i, '')
+          .trim() || 'sm58_luw_extracted';
+        return `${cleaned}.${extension}`;
+      }
+
+      function leftRotate(value, shift) {
+        return ((value << shift) | (value >>> (32 - shift))) >>> 0;
+      }
+
+      function md5Bytes(input) {
+        const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+        const shifts = [
+          7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+          5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+          4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+          6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+        ];
+        const k = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0);
+
+        let paddedLength = bytes.length + 1;
+        while (paddedLength % 64 !== 56) paddedLength += 1;
+        const message = new Uint8Array(paddedLength + 8);
+        message.set(bytes);
+        message[bytes.length] = 0x80;
+
+        const bitLength = BigInt(bytes.length) * 8n;
+        for (let i = 0; i < 8; i += 1) {
+          message[paddedLength + i] = Number((bitLength >> BigInt(8 * i)) & 0xffn);
+        }
+
+        let a0 = 0x67452301;
+        let b0 = 0xefcdab89;
+        let c0 = 0x98badcfe;
+        let d0 = 0x10325476;
+
+        for (let offset = 0; offset < message.length; offset += 64) {
+          const m = new Uint32Array(16);
+          for (let j = 0; j < 16; j += 1) {
+            const p = offset + j * 4;
+            m[j] = (message[p] | (message[p + 1] << 8) | (message[p + 2] << 16) | (message[p + 3] << 24)) >>> 0;
+          }
+
+          let a = a0;
+          let b = b0;
+          let c = c0;
+          let d = d0;
+
+          for (let i = 0; i < 64; i += 1) {
+            let f;
+            let g;
+            if (i < 16) {
+              f = (b & c) | ((~b) & d);
+              g = i;
+            } else if (i < 32) {
+              f = (d & b) | ((~d) & c);
+              g = (5 * i + 1) % 16;
+            } else if (i < 48) {
+              f = b ^ c ^ d;
+              g = (3 * i + 5) % 16;
+            } else {
+              f = c ^ (b | (~d));
+              g = (7 * i) % 16;
+            }
+
+            const temp = d;
+            d = c;
+            c = b;
+            b = (b + leftRotate((a + f + k[i] + m[g]) >>> 0, shifts[i])) >>> 0;
+            a = temp;
+          }
+
+          a0 = (a0 + a) >>> 0;
+          b0 = (b0 + b) >>> 0;
+          c0 = (c0 + c) >>> 0;
+          d0 = (d0 + d) >>> 0;
+        }
+
+        function wordToHexLittleEndian(word) {
+          let out = '';
+          for (let i = 0; i < 4; i += 1) {
+            out += ((word >>> (8 * i)) & 0xff).toString(16).padStart(2, '0');
+          }
+          return out;
+        }
+
+        return [a0, b0, c0, d0].map(wordToHexLittleEndian).join('');
+      }
+
+      function bufferToHex(buffer) {
+        return Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+
+      async function digestHex(algorithm, bytes) {
+        if (!window.crypto || !window.crypto.subtle) {
+          throw new Error('Web Crypto API is not available in this browser/context.');
+        }
+        const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        const digest = await window.crypto.subtle.digest(algorithm, data);
+        return bufferToHex(digest);
+      }
+
+      async function calculateHashes(bytes) {
+        const hashes = { md5: md5Bytes(bytes), sha1: '', sha256: '', sha512: '' };
+        hashes.sha1 = await digestHex('SHA-1', bytes);
+        hashes.sha256 = await digestHex('SHA-256', bytes);
+        hashes.sha512 = await digestHex('SHA-512', bytes);
+        return hashes;
+      }
+
+      async function extract() {
+        resetResult();
+        const text = logText.value;
+        if (!text.trim()) {
+          setStatus('No input text. Load a .txt/.log file or paste the SM58 log.', 'error');
+          return;
+        }
+
+        extractBtn.disabled = true;
+        try {
+          const { segment, note } = segmentForMode(text);
+          const collected = collectBinaryHex(segment);
+          const normalized = normalizeHex(collected.hex);
+          const bytes = hexToBytes(normalized.hex);
+
+          if (!bytes.length) {
+            throw new Error('The extracted result contains 0 bytes.');
+          }
+
+          const isPdf = isPdfBytes(bytes);
+          const extension = isPdf ? 'pdf' : 'txt';
+          const mimeType = isPdf ? 'application/pdf' : 'text/plain;charset=utf-8';
+          const blob = new Blob([bytes], { type: mimeType });
+          currentBlobUrl = URL.createObjectURL(blob);
+          const fileName = makeFileName(outputBaseName.value, extension);
+
+          downloadLink.href = currentBlobUrl;
+          downloadLink.download = fileName;
+          downloadLink.textContent = `Download ${fileName}`;
+          downloadLink.removeAttribute('aria-disabled');
+
+          if (isPdf) {
+            preview.src = currentBlobUrl;
+            preview.style.display = 'block';
+          }
+
+          statRows.textContent = formatNumber(collected.rows);
+          statHex.textContent = formatNumber(normalized.hex.length);
+          statBytes.textContent = formatNumber(bytes.length);
+          statType.textContent = isPdf ? 'PDF' : 'Not PDF (.txt)';
+          setHashPlaceholders('Calculating...');
+          setStatus(`Extracted ${formatNumber(bytes.length)} bytes from ${note}. Calculating hashes...`, isPdf ? 'ok' : 'warn');
+
+          const hashes = await calculateHashes(bytes);
+          hashMd5.textContent = hashes.md5;
+          hashSha1.textContent = hashes.sha1;
+          hashSha256.textContent = hashes.sha256;
+          hashSha512.textContent = hashes.sha512;
+
+          const trimInfo = [];
+          if (normalized.usedPdfTrim) trimInfo.push('trimmed to %PDF');
+          if (normalized.usedEofTrim) trimInfo.push('trimmed after %%EOF');
+          const trimSuffix = trimInfo.length ? ` (${trimInfo.join(', ')})` : '';
+          const pdfHint = normalized.pdfFoundElsewhere ? ' A PDF signature was found later in the data; try Auto mode if you expected a PDF.' : '';
+          setStatus(`Done. Source: ${note}. Generated ${formatNumber(bytes.length)} bytes as ${fileName}${trimSuffix}.${pdfHint}`, isPdf ? 'ok' : 'warn');
+        } catch (error) {
+          setHashPlaceholders('-');
+          setStatus(error instanceof Error ? error.message : String(error), 'error');
+        } finally {
+          extractBtn.disabled = false;
+        }
+      }
+
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      fileInput.addEventListener('change', () => loadFile(fileInput.files && fileInput.files[0]));
+
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('dragover');
+        });
+      });
+
+      dropzone.addEventListener('drop', (event) => {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        loadFile(file);
+      });
+
+      extractBtn.addEventListener('click', extract);
+      clearBtn.addEventListener('click', () => {
+        resetResult();
+        logText.value = '';
+        fileInput.value = '';
+        outputBaseName.value = 'sm58_luw_extracted';
+        setStatus('Cleared. Load or paste a new SM58 log.');
+      });
+    })();
+  </script>
+</body>
+</html>
